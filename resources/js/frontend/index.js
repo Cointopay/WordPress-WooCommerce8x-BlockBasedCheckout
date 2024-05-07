@@ -44,5 +44,5 @@ const cointopay_ctp = {
 		features: settings.supports,
 	},
 };
-console.log(cointopay_ctp);
+//console.log(cointopay_ctp);
 registerPaymentMethod( cointopay_ctp );
