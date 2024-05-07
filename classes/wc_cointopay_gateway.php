@@ -162,7 +162,7 @@ class WC_Cointopay_Gateway extends WC_Payment_Gateway {
 		);
 		$itemnames = 'Order ' . $order->get_order_number() . ' - ' . implode(', ', $itemnames);
 		$params    = array(
-			'body' => 'SecurityCode=' . $this->secret . '&MerchantID=' . $this->merchantid . '&Amount=' . number_format($order->get_total(), 8, '.', '') . '&AltCoinID=' . $this->altcoinid . '&output=json&inputCurrency=' . get_woocommerce_currency() . '&CustomerReferenceNr=' . $orderid . '&returnurl=' . rawurlencode(esc_url($this->get_return_url($order))) . '&transactionconfirmurl=' . site_url('/?wc-api=Cointopay') . '&transactionfailurl=' . rawurlencode(esc_url($order->get_cancel_order_url())),
+			'body' => 'SecurityCode=' . $this->secret . '&MerchantID=' . $this->merchantid . '&Amount=' . number_format($order->get_total(), 8, '.', '') . '&AltCoinID=' . $this->altcoinid . '&output=json&inputCurrency=' . get_woocommerce_currency() . '&CustomerReferenceNr=' . $orderid . '-' . $order->get_order_number() . '&returnurl=' . rawurlencode(esc_url($this->get_return_url($order))) . '&transactionconfirmurl=' . site_url('/?wc-api=Cointopay') . '&transactionfailurl=' . rawurlencode(esc_url($order->get_cancel_order_url())),
 		);
 		$url       = 'https://app.cointopay.com/MerchantAPI?Checkout=true';
 		$response  = wp_safe_remote_post($url, $params);
@@ -181,6 +181,11 @@ class WC_Cointopay_Gateway extends WC_Payment_Gateway {
 		}
 
 	}//end process_payment()
+	
+	private function extractOrderId(string $customer_reference_nr)
+	{
+		return intval(explode('-', sanitize_text_field($customer_reference_nr))[0]);
+	}
 
 
 	/**
@@ -196,7 +201,7 @@ class WC_Cointopay_Gateway extends WC_Payment_Gateway {
 		{
 		global $woocommerce;
 		$woocommerce->cart->empty_cart();
-		$orderid          = ( !empty(intval($_REQUEST['CustomerReferenceNr'])) ) ? intval($_REQUEST['CustomerReferenceNr']) : 0;
+		$orderid          = ( !empty(intval($_REQUEST['CustomerReferenceNr'])) ) ? $this->extractOrderId($_REQUEST['CustomerReferenceNr']) : 0;
 		$ordstatus        = ( !empty(sanitize_text_field($_REQUEST['status'])) ) ? sanitize_text_field($_REQUEST['status']) : '';
 		$ordtransactionid = ( !empty(sanitize_text_field($_REQUEST['TransactionID'])) ) ? sanitize_text_field($_REQUEST['TransactionID']) : '';
 		$ordconfirmcode   = ( !empty(sanitize_text_field($_REQUEST['ConfirmCode'])) ) ? sanitize_text_field($_REQUEST['ConfirmCode']) : '';
@@ -216,13 +221,14 @@ class WC_Cointopay_Gateway extends WC_Payment_Gateway {
 				exit;
 		}
 		else{
+			$transaction_order_id = $this->extractOrderId($transactionData['data']['CustomerReferenceNr']);
 			if($transactionData['data']['Security'] != $ordconfirmcode){
 				get_header();
 			echo '<div class="container" style="text-align: center;"><div><div><br><br><h2 style="color:#ff0000">Failure!</h2><img style="margin:auto;"  src="' . esc_url(WC_Cointopay_Payments::plugin_url().'/assets/images/fail.png') . '"><p style="font-size:20px;color:#5C5C5C;">Data mismatch! ConfirmCode doesn\'t match</p><a href="' . esc_url(site_url()) . '" style="background-color: #ff0000;border: none;color: white; padding: 15px 32px; text-align: center;text-decoration: none;display: inline-block; font-size: 16px;" >Back</a><br><br></div></div></div>';
 			get_footer();
 				exit;
 			}
-			elseif($transactionData['data']['CustomerReferenceNr'] != $orderid){
+			elseif($transaction_order_id != $orderid){
 				get_header();
 			echo '<div class="container" style="text-align: center;"><div><div><br><br><h2 style="color:#ff0000">Failure!</h2><img style="margin:auto;"  src="' . esc_url(WC_Cointopay_Payments::plugin_url().'/assets/images/fail.png') . '"><p style="font-size:20px;color:#5C5C5C;">Data mismatch! CustomerReferenceNr doesn\'t match</p><a href="' . esc_url(site_url()) . '" style="background-color: #ff0000;border: none;color: white; padding: 15px 32px; text-align: center;text-decoration: none;display: inline-block; font-size: 16px;" >Back</a><br><br></div></div></div>';
 			get_footer();
